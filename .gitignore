@@ -11,7 +11,8 @@ web/bundles/*
 # Configuration files
 app/config/parameters.ini
 
-composer.*
+composer.phar
+composer.lock
 vendor
 
 phpunit.xml

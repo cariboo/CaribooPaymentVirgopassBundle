@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<phpunit bootstrap="./Tests/bootstrap.php">
+    <testsuites>
+        <testsuite name="CaribooPaymentVirgopassBundle">
+            <directory suffix="Test.php">./Tests</directory>
+        </testsuite>
+    </testsuites>
+
+    <php>
+        <!-- Sandbox Credentials only :) -->
+        <server name="API_LOGIN" value="" />
+        <server name="API_PASSWORD" value="" />
+        <server name="API_SERVICE" value="" />
+    </php>
+</phpunit>

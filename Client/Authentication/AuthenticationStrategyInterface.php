@@ -22,6 +22,15 @@ use JMS\Payment\CoreBundle\BrowserKit\Request;
 
 interface AuthenticationStrategyInterface
 {
-    function getApiEndpoint($isDebug);
+    /**
+     * Return the URL to call on the Virgopass API based on the function to execute.
+     *
+     * @param   string  $version version of the Virgopass API
+     * @param   string  $method method to call on the Virgopass API
+     * @param   string  $isDebug if true, the Virgopass Sandbox is called instead of the production API
+     * @return  Response
+     */
+    function getApiEndpoint($version, $method, $isDebug);
+
     function authenticate(Request $request);
 }

@@ -7,12 +7,12 @@
     <parameters>
         <parameter key="payment.plugin.virgopass_mobile_checkout.class">Cariboo\Payment\VirgopassBundle\Plugin\MobileCheckoutPlugin</parameter>
         <parameter key="payment.virgopass.mobile_checkout.return_url"></parameter>
+        <parameter key="payment.virgopass.mobile_checkout.error_url"></parameter>
         <parameter key="payment.virgopass.mobile_checkout.cancel_url"></parameter>
 
         <parameter key="payment.virgopass.authentication_strategy.token.class">Cariboo\Payment\VirgopassBundle\Client\Authentication\TokenAuthenticationStrategy</parameter>
-        <parameter key="payment.virgopass.username"></parameter>
+        <parameter key="payment.virgopass.login"></parameter>
         <parameter key="payment.virgopass.password"></parameter>
-        <parameter key="payment.virgopass.signature"></parameter>
         
         <parameter key="payment.form.virgopass_mobile_checkout_type.class">Cariboo\Payment\VirgopassBundle\Form\MobileCheckoutType</parameter>
 
@@ -23,16 +23,17 @@
         <service id="payment.virgopass.authentication_strategy.token" class="%payment.virgopass.authentication_strategy.token.class%">
             <argument>%payment.virgopass.login%</argument>
             <argument>%payment.virgopass.password%</argument>
-            <argument>%payment.virgopass.service%</argument>
         </service>
 
         <service id="payment.virgopass.authentication_strategy" alias="payment.virgopass.authentication_strategy.token" />
 
         <service id="payment.plugin.virgopass_mobile_checkout" class="%payment.plugin.virgopass_mobile_checkout.class%">
+            <argument type="service" id="payment.virgopass.client" />
+            <argument type="collection">%payment.virgopass.mobile_checkout.services%</argument>
             <argument>%payment.virgopass.mobile_checkout.return_url%</argument>
             <argument>%payment.virgopass.mobile_checkout.error_url%</argument>
             <argument>%payment.virgopass.mobile_checkout.cancel_url%</argument>
-            <argument type="service" id="payment.virgopass.client" />
+            <argument type="service" id="logger" />
             <tag name="payment.plugin" />
         </service>
 

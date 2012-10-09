@@ -3,7 +3,7 @@ Installation
 ============
 Dependencies
 ------------
-This plugin depends on the JMSPaymentCoreBundle_, so you'll need to add this to your kernel
+This plugin depends on the CaribooPaymentCoreBundle_, so you'll need to add this to your kernel
 as well even if you don't want to use its persistence capabilities.
 
 Configuration
@@ -23,7 +23,7 @@ Usage
 =====
 With the Payment Plugin Controller (Recommended)
 ------------------------------------------------
-http://jmsyst.com/bundles/JMSPaymentCoreBundle/master/usage
+https://github.com/cariboo/payment-core-bundle.git
 
 Without the Payment Plugin Controller
 -------------------------------------
@@ -33,5 +33,3 @@ integrity checks to validate transactions. If you don't need these checks, and o
 an easy way to communicate with the Virgopass API, then you can use the plugin directly::
 
     $plugin = $container->get('payment.plugin.virgopass_mobile_checkout');
-
-.. _JMSPaymentCoreBundle: https://github.com/schmittjoh/JMSPaymentCoreBundle/blob/master/Resources/doc/index.rst

@@ -42,7 +42,7 @@ class CaribooPaymentVirgopassExtension extends Extension
         $container->setParameter('payment.virgopass.mobile_checkout.cancel_url', $config['cancel_url']);
         $services = array();
         foreach (array_keys($config['services']) as $name) {
-            $services[$service] = sprintf('payment.virgopass.%s', $name);
+            $services[$name] = $config['services'][$name];
         }
         $container->setParameter('payment.virgopass.services', $services);
         $container->setParameter('payment.virgopass.debug', $config['debug']);

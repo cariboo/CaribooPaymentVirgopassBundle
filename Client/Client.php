@@ -75,6 +75,7 @@ class Client
      *
      * @param   string  $token token generated with the getToken method
      * @param   array   $optionalParameters Optional parameters can be found on www.virgopass.com
+     * @throws  ActionRequiredException The user is redirected to the payment page of its carrier
      * @return  Response
      */
     public function requestPurchase($token, array $optionalParameters = array())
@@ -91,6 +92,7 @@ class Client
      *
      * @param   string  $token token generated with the getToken method
      * @param   array   $optionalParameters Optional parameters can be found on www.virgopass.com
+     * @throws  ActionRequiredException The user is redirected to the carrier payment page
      * @return  Response
      */
     public function requestSubscription($token, array $optionalParameters = array())
@@ -105,6 +107,7 @@ class Client
      *
      * @param   string  $token token generated with the getToken method
      * @param   array   $optionalParameters Optional parameters can be found on www.virgopass.com
+     * @throws  ActionRequiredException The user is redirected to the carrier unsubscription page
      * @return  Response
      */
     public function requestResiliation($token, array $optionalParameters = array())
@@ -171,7 +174,7 @@ class Client
         // setup request
         $request = new Request(
             $this->authenticationStrategy->getApiEndpoint(self::API_VERSION, $method, $this->isDebug),
-            $methods[$method],
+            self::$methods[$method],
             $parameters
         );
 

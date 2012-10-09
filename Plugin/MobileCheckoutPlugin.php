@@ -4,12 +4,12 @@ namespace Cariboo\Payment\VirgopassBundle\Plugin;
 
 use JMS\Payment\CoreBundle\Model\ExtendedDataInterface;
 use JMS\Payment\CoreBundle\Model\FinancialTransactionInterface;
-use JMS\Payment\CoreBundle\Plugin\PluginInterface;
 use JMS\Payment\CoreBundle\Plugin\AbstractPlugin;
 use JMS\Payment\CoreBundle\Plugin\Exception\PaymentPendingException;
-use JMS\Payment\CoreBundle\Plugin\Exception\FinancialException;
+use JMS\Payment\CoreBundle\Plugin\Exception\InvalidPaymentInstructionException;
 use JMS\Payment\CoreBundle\Plugin\Exception\Action\VisitUrl;
 use JMS\Payment\CoreBundle\Plugin\Exception\ActionRequiredException;
+use JMS\Payment\CoreBundle\Plugin\PluginInterface;
 use JMS\Payment\CoreBundle\Util\Number;
 use Cariboo\Payment\VirgopassBundle\Client\Client;
 use Cariboo\Payment\VirgopassBundle\Client\Response;
@@ -32,13 +32,14 @@ use Cariboo\Payment\VirgopassBundle\Client\Response;
 
 class MobileCheckoutPlugin extends AbstractPlugin
 {
-    protected static $services = array(
-        '2.00' => 'ABO_48H',
-    );
+    /**
+     * @var \Cariboo\Payment\VirgopassBundle\Client\Client
+     */
+    protected $client;
 
-    protected static $rates = array(
-        'ABO_48H' => 2.00,
-    );
+    /**
+     */
+    protected $services;
 
     /**
      * @var string
@@ -56,58 +57,72 @@ class MobileCheckoutPlugin extends AbstractPlugin
     protected $cancelUrl;
 
     /**
-     * @var \Cariboo\Payment\VirgopassBundle\Client\Client
      */
-    protected $client;
+    protected $logger;
 
     /**
+     * @param \Cariboo\Payment\VirgopassBundle\Client\Client $client
+     * @param $services
      * @param string $returnUrl
      * @param string $errorUrl
      * @param string $cancelUrl
-     * @param \Cariboo\Payment\VirgopassBundle\Client\Client $client
+     * @param $logger
      */
-    public function __construct($returnUrl, $errorURL, $cancelUrl, Client $client)
+    public function __construct(Client $client, $services, $returnUrl, $errorUrl, $cancelUrl, $logger)
     {
-        $this->returnUrl = $returnUrl;
-        $this->errorUrl = $errorUrl;
-        $this->cancelUrl = $cancelUrl;
-        $this->client = $client;
+        $this->client       = $client;
+        $this->services     = $services;
+        $this->returnUrl    = $returnUrl;
+        $this->errorUrl     = $errorUrl;
+        $this->cancelUrl    = $cancelUrl;
+
+        $this->logger       = $logger;
     }
 
     public function approveAndDeposit(FinancialTransactionInterface $transaction, $retry)
     {
-        $token = $this->obtainMobileCheckoutToken($transaction, $paymentAction);
+        $service = $transaction->getPayment()->getPaymentInstruction()->getExtendedData()->get('level');
+        $this->logger->debug('service: '.$service);
 
-        $details = $this->client->requestGetExpressCheckoutDetails($token);
-        $this->throwUnlessSuccessResponse($details, $transaction);
+        $token = $this->obtainMobileCheckoutToken($transaction, $service);
+        $this->logger->info('token: '.$token);
+
+        // $details = $this->client->requestGetExpressCheckoutDetails($token);
+        // $this->throwUnlessSuccessResponse($details, $transaction);
 
         // verify checkout status
-        switch ($details->body->get('CHECKOUTSTATUS')) {
-            case 'PaymentActionFailed':
-                $ex = new FinancialException('PaymentAction failed.');
-                $transaction->setResponseCode('Failed');
-                $transaction->setReasonCode('PaymentActionFailed');
-                $ex->setFinancialTransaction($transaction);
+        // switch ($details->body->get('CHECKOUTSTATUS')) {
+        //     case 'PaymentActionFailed':
+        //         $ex = new FinancialException('PaymentAction failed.');
+        //         $transaction->setResponseCode('Failed');
+        //         $transaction->setReasonCode('PaymentActionFailed');
+        //         $ex->setFinancialTransaction($transaction);
 
-                throw $ex;
+        //         throw $ex;
 
-            case 'PaymentCompleted':
-                break;
+        //     case 'PaymentCompleted':
+        //         break;
 
-            case 'PaymentActionNotInitiated':
-                break;
+        //     case 'PaymentActionNotInitiated':
+        //         break;
 
-            default:
-                $actionRequest = new ActionRequiredException('User has not yet authorized the transaction.');
-                $actionRequest->setFinancialTransaction($transaction);
-                $actionRequest->setAction(new VisitUrl($this->client->getAuthenticateMobileCheckoutTokenUrl($token)));
+        //     default:
+        //         $actionRequest = new ActionRequiredException('User has not yet authorized the transaction.');
+        //         $actionRequest->setFinancialTransaction($transaction);
+        //         $actionRequest->setAction(new VisitUrl($this->client->getAuthenticateMobileCheckoutTokenUrl($token)));
 
-                throw $actionRequest;
-        }
+        //         throw $actionRequest;
+        // }
+
+        $actionRequest = new ActionRequiredException('User has not yet authorized the transaction.');
+        $actionRequest->setFinancialTransaction($transaction);
+        $actionRequest->setAction(new VisitUrl($this->client->getAuthenticateMobileCheckoutTokenUrl($token)));
+
+        throw $actionRequest;
 
         // complete the transaction
         $data = $transaction->getExtendedData();
-        $data->set('paypal_payer_id', $details->body->get('PAYERID'));
+        $data->set('virgopass_purchase_id', $details->body->get('purchase_id'));
 
         $response = $this->client->requestDoExpressCheckoutPayment(
             $data->get('express_checkout_token'),
@@ -144,13 +159,9 @@ class MobileCheckoutPlugin extends AbstractPlugin
 
     /**
      * @param \JMS\Payment\CoreBundle\Model\FinancialTransactionInterface $transaction
-     * @param string $paymentAction
-     *
-     * @throws \JMS\Payment\CoreBundle\Plugin\Exception\ActionRequiredException if user has to authenticate the token
-     *
      * @return string
      */
-    protected function obtainMobileCheckoutToken(FinancialTransactionInterface $transaction, $paymentAction)
+    protected function obtainMobileCheckoutToken(FinancialTransactionInterface $transaction, $service, $subscription = null)
     {
         $data = $transaction->getExtendedData();
         if ($data->has('mobile_checkout_token')) {
@@ -159,28 +170,26 @@ class MobileCheckoutPlugin extends AbstractPlugin
 
         $opts = $data->has('checkout_params') ? $data->get('checkout_params') : array();
 
-        $response = $this->client->requestGetToken(
-            $transaction->getRequestedAmount(),
-            $this->getReturnUrl($data),
-            $this->getCancelUrl($data),
-            $opts
-        );
+        $response = $this->client->requestGetToken($service, $transaction->getId(), $subscription);
+        $token = $response->body->get('token');
+        $this->logger->info('token: '.$token);
         $this->throwUnlessSuccessResponse($response, $transaction);
 
-        $data->set('express_checkout_token', $response->body->get('TOKEN'));
+        $data->set('mobile_checkout_token', $token);
 
-        $authenticateTokenUrl = $this->client->getAuthenticateMobileCheckoutTokenUrl($response->body->get('TOKEN'));
+        // $authenticateTokenUrl = $this->client->getAuthenticateMobileCheckoutTokenUrl($response->body->get('token'));
+        // $actionRequest = new ActionRequiredException('User must authorize the transaction.');
+        // $actionRequest->setFinancialTransaction($transaction);
+        // $actionRequest->setAction(new VisitUrl($authenticateTokenUrl));
 
-        $actionRequest = new ActionRequiredException('User must authorize the transaction.');
-        $actionRequest->setFinancialTransaction($transaction);
-        $actionRequest->setAction(new VisitUrl($authenticateTokenUrl));
+        // throw $actionRequest;
 
-        throw $actionRequest;
+        return $token;
     }
 
     /**
      * @param \JMS\Payment\CoreBundle\Model\FinancialTransactionInterface $transaction
-     * @param \JMS\Payment\PaypalBundle\Client\Response $response
+     * @param \Cariboo\Payment\VirgopassBundle\Client\Response $response
      * @return null
      * @throws \JMS\Payment\CoreBundle\Plugin\Exception\FinancialException
      */

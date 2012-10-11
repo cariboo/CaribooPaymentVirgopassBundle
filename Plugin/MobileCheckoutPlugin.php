@@ -81,10 +81,8 @@ class MobileCheckoutPlugin extends AbstractPlugin
 
     public function approveAndDeposit(FinancialTransactionInterface $transaction, $retry)
     {
-        $service = $transaction->getPayment()->getPaymentInstruction()->getExtendedData()->get('level');
-        $this->logger->debug('service: '.$service);
-
-        $token = $this->obtainMobileCheckoutToken($transaction, $service);
+        $this->logger->info('transaction state: '.$transaction->getState());
+        $token = $this->obtainMobileCheckoutToken($transaction);
         $this->logger->info('token: '.$token);
 
         // $details = $this->client->requestGetExpressCheckoutDetails($token);
@@ -114,11 +112,15 @@ class MobileCheckoutPlugin extends AbstractPlugin
         //         throw $actionRequest;
         // }
 
-        $actionRequest = new ActionRequiredException('User has not yet authorized the transaction.');
-        $actionRequest->setFinancialTransaction($transaction);
-        $actionRequest->setAction(new VisitUrl($this->client->getAuthenticateMobileCheckoutTokenUrl($token)));
-
-        throw $actionRequest;
+        // Verify transaction status
+        $this->logger->info('transaction state test: '.$transaction->getState());
+        if (self::STATE_PENDING == $transaction->getState())
+        {
+            $actionRequest = new ActionRequiredException('User has not yet authorized the transaction.');
+            $actionRequest->setFinancialTransaction($transaction);
+            $actionRequest->setAction(new VisitUrl($this->client->requestPurchase($token)));
+            throw $actionRequest;
+        }
 
         // complete the transaction
         $data = $transaction->getExtendedData();
@@ -161,28 +163,24 @@ class MobileCheckoutPlugin extends AbstractPlugin
      * @param \JMS\Payment\CoreBundle\Model\FinancialTransactionInterface $transaction
      * @return string
      */
-    protected function obtainMobileCheckoutToken(FinancialTransactionInterface $transaction, $service, $subscription = null)
+    protected function obtainMobileCheckoutToken(FinancialTransactionInterface $transaction)
     {
+        // Abonnements non supportés actuellement
+        $subscription = null;
+
         $data = $transaction->getExtendedData();
         if ($data->has('mobile_checkout_token')) {
             return $data->get('mobile_checkout_token');
         }
 
-        $opts = $data->has('checkout_params') ? $data->get('checkout_params') : array();
+        $service = $transaction->getPayment()->getPaymentInstruction()->getExtendedData()->get('level');
+        $this->logger->info('service: '.$service);
 
-        $response = $this->client->requestGetToken($service, $transaction->getId(), $subscription);
-        $token = $response->body->get('token');
-        $this->logger->info('token: '.$token);
+        $response = $this->client->requestGetToken($service, $transaction->getTrackingId(), $subscription);
         $this->throwUnlessSuccessResponse($response, $transaction);
 
+        $token = $response->body->get('token');
         $data->set('mobile_checkout_token', $token);
-
-        // $authenticateTokenUrl = $this->client->getAuthenticateMobileCheckoutTokenUrl($response->body->get('token'));
-        // $actionRequest = new ActionRequiredException('User must authorize the transaction.');
-        // $actionRequest->setFinancialTransaction($transaction);
-        // $actionRequest->setAction(new VisitUrl($authenticateTokenUrl));
-
-        // throw $actionRequest;
 
         return $token;
     }

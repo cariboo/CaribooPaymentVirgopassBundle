@@ -27,16 +27,16 @@ class Client
 {
     const API_VERSION = '1.5';
 
-    protected static $methods = array(
-        'getToken'              => 'POST',
-        'purchase'              => 'GET',
-        'subscription'          => 'GET',
-        'resiliation'           => 'GET',
-        'getUserInfo'           => 'POST',
-        'isSub'                 => 'POST',
-        'getServiceInfo'        => 'POST',
-        'isIplusBoxEligible'    => 'POST',
-    );
+    // protected static $methods = array(
+    //     'getToken'              => 'POST',
+    //     'purchase'              => 'GET',
+    //     'subscription'          => 'GET',
+    //     'resiliation'           => 'GET',
+    //     'getUserInfo'           => 'POST',
+    //     'isSub'                 => 'POST',
+    //     'getServiceInfo'        => 'POST',
+    //     'isIplusBoxEligible'    => 'POST',
+    // );
 
     protected $authenticationStrategy;
 
@@ -65,7 +65,7 @@ class Client
     {
         return $this->sendApiRequest('getToken', array(
             'service_id'        => $service,
-            'session_id'        => $session,
+            'session_id'        => '1111', //$session,
             'subscription_id'   => $subscription,
         ));
     }
@@ -76,11 +76,11 @@ class Client
      * @param   string  $token token generated with the getToken method
      * @param   array   $optionalParameters Optional parameters can be found on www.virgopass.com
      * @throws  ActionRequiredException The user is redirected to the payment page of its carrier
-     * @return  Response
+     * @return  string  URL of the carrier payment page
      */
     public function requestPurchase($token, array $optionalParameters = array())
     {
-        return $this->sendApiRequest('purchase', array_merge($optionalParameters, array(
+        return $this->getApiURL('purchase', array_merge($optionalParameters, array(
             'token' => $token,
         )));
     }
@@ -93,11 +93,11 @@ class Client
      * @param   string  $token token generated with the getToken method
      * @param   array   $optionalParameters Optional parameters can be found on www.virgopass.com
      * @throws  ActionRequiredException The user is redirected to the carrier payment page
-     * @return  Response
+     * @return  string  URL of the carrier payment page
      */
     public function requestSubscription($token, array $optionalParameters = array())
     {
-        return $this->sendApiRequest('subscription', array_merge($optionalParameters, array(
+        return $this->getApiURL('subscription', array_merge($optionalParameters, array(
             'token' => $token,
         )));
     }
@@ -108,11 +108,11 @@ class Client
      * @param   string  $token token generated with the getToken method
      * @param   array   $optionalParameters Optional parameters can be found on www.virgopass.com
      * @throws  ActionRequiredException The user is redirected to the carrier unsubscription page
-     * @return  Response
+     * @return  string  URL of the carrier unsubscription page
      */
     public function requestResiliation($token, array $optionalParameters = array())
     {
-        return $this->sendApiRequest('resiliation', array_merge($optionalParameters, array(
+        return $this->getApiURL('resiliation', array_merge($optionalParameters, array(
             'token' => $token,
         )));
     }
@@ -174,25 +174,37 @@ class Client
         // setup request
         $request = new Request(
             $this->authenticationStrategy->getApiEndpoint(self::API_VERSION, $method, $this->isDebug),
-            self::$methods[$method],
+            'POST',
             $parameters
         );
 
-        // authenticate request if token is not defined
-        if (!array_key_exists('token', $parameters))
-        {
-            $this->authenticationStrategy->authenticate($request);
-        }
+        $this->authenticationStrategy->authenticate($request);
 
         $response = $this->request($request);
         if (200 !== $response->getStatus()) {
             throw new CommunicationException('The API request was not successful (Status: '.$response->getStatus().'): '.$response->getContent());
         }
 
-        $parameters = array();
-        parse_str($response->getContent(), $parameters);
+        $values = array();
+        parse_str($response->getContent(), $values);
 
-        return new Response($parameters);
+        return new Response($values);
+    }
+
+    protected function getApiURL($method, array $parameters)
+    {
+        $uri = $this->authenticationStrategy->getApiEndpoint(self::API_VERSION, $method, $this->isDebug);
+        $params = '';
+        foreach ($parameters as $name => $value)
+        {
+            $params += '&'.$name.'='.$value;
+        }
+        if (!empty($param))
+        {
+            $params = '?'.substr($params, 1);
+        }
+
+        return $uri.$params;
     }
 
     protected function setCurlOption($name, $value)

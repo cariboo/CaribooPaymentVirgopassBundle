@@ -24,9 +24,9 @@ class Response
 {
     public $body;
 
-    public function __construct(array $parameters)
+    public function __construct($response)
     {
-        $this->body = new ParameterBag($parameters);
+        $this->body = new ParameterBag($this->parse($response));
     }
 
     public function isSuccess()
@@ -64,5 +64,20 @@ class Response
         }
 
         return $str;
+    }
+
+    private function parse($txt)
+    {
+        $ret = array();
+        $cl = preg_split('/\n/', $txt);
+        foreach($cl as $k => $v )
+        {
+            if( ! empty($v))
+            {
+                list($key,$val) = explode(': ', $v, 2);
+                $ret[$key] = $val;
+            }
+        }
+        return $ret;
     }
 }

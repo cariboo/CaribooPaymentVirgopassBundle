@@ -65,7 +65,7 @@ class Client
     {
         return $this->sendApiRequest('getToken', array(
             'service_id'        => $service,
-            'session_id'        => '1111', //$session,
+            'session_id'        => $session,
             'subscription_id'   => $subscription,
         ));
     }
@@ -80,6 +80,7 @@ class Client
      */
     public function requestPurchase($token, array $optionalParameters = array())
     {
+
         return $this->getApiURL('purchase', array_merge($optionalParameters, array(
             'token' => $token,
         )));
@@ -185,26 +186,18 @@ class Client
             throw new CommunicationException('The API request was not successful (Status: '.$response->getStatus().'): '.$response->getContent());
         }
 
-        $values = array();
-        parse_str($response->getContent(), $values);
-
-        return new Response($values);
+        return new Response($response->getContent());
     }
 
     protected function getApiURL($method, array $parameters)
     {
-        $uri = $this->authenticationStrategy->getApiEndpoint(self::API_VERSION, $method, $this->isDebug);
-        $params = '';
+        $url = $this->authenticationStrategy->getApiEndpoint(self::API_VERSION, $method, $this->isDebug);
         foreach ($parameters as $name => $value)
         {
-            $params += '&'.$name.'='.$value;
-        }
-        if (!empty($param))
-        {
-            $params = '?'.substr($params, 1);
+            $url .= '&'.$name.'='.$value;
         }
 
-        return $uri.$params;
+        return $url;
     }
 
     protected function setCurlOption($name, $value)

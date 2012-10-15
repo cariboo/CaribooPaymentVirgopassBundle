@@ -36,11 +36,18 @@ class Configuration
                     ->scalarNode('cancel_url')->defaultNull()->end()
                     ->booleanNode('debug')->defaultValue('%kernel.debug%')->end()
                     ->arrayNode('services')
+                        ->requiresAtLeastOneElement()
                         ->useAttributeAsKey('name')
-                        ->prototype('scalar')->end()
+                        ->prototype('array')
+                            ->children()
+                                ->scalarNode('price')->isRequired()->cannotBeEmpty()->end()
+                                ->scalarNode('hours')->isRequired()->cannotBeEmpty()->end()
+                            ->end()
+                        ->end()
                     ->end()
                 ->end()
             ->end()
             ->buildTree();
+                        // ->prototype('scalar')->end()
     }
 }

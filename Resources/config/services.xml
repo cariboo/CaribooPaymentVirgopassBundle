@@ -30,7 +30,7 @@
         <service id="payment.plugin.virgopass_mobile_checkout" class="%payment.plugin.virgopass_mobile_checkout.class%">
             <argument type="service" id="service_container" />
             <argument type="service" id="payment.virgopass.client" />
-            <argument type="collection">%payment.virgopass.mobile_checkout.services%</argument>
+            <argument type="collection">%payment.virgopass.services%</argument>
             <argument>%payment.virgopass.mobile_checkout.return_url%</argument>
             <argument>%payment.virgopass.mobile_checkout.error_url%</argument>
             <argument>%payment.virgopass.mobile_checkout.cancel_url%</argument>

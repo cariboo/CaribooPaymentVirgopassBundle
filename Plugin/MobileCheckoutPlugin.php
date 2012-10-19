@@ -44,10 +44,6 @@ class MobileCheckoutPlugin extends AbstractPlugin
     protected $client;
 
     /**
-     */
-    protected $services;
-
-    /**
      * @var string
      */
     protected $returnUrl;
@@ -63,60 +59,68 @@ class MobileCheckoutPlugin extends AbstractPlugin
     protected $cancelUrl;
 
     /**
-     */
-    protected $logger;
-
-    /**
+     * @param ContainerInterface $container
      * @param \Cariboo\Payment\VirgopassBundle\Client\Client $client
-     * @param $services
      * @param string $returnUrl
      * @param string $errorUrl
      * @param string $cancelUrl
-     * @param $logger
      */
-    public function __construct(ContainerInterface $container, Client $client, $services, $returnUrl, $errorUrl, $cancelUrl, $logger)
+    public function __construct(ContainerInterface $container, Client $client, $returnUrl, $errorUrl, $cancelUrl)
     {
         $this->container    = $container;
         $this->client       = $client;
-        $this->services     = $services;
         $this->returnUrl    = $returnUrl;
         $this->errorUrl     = $errorUrl;
         $this->cancelUrl    = $cancelUrl;
-
-        $this->logger       = $logger;
     }
 
     public function approveAndDeposit(FinancialTransactionInterface $transaction, $retry)
     {
+        $logger = $this->container->get('logger');
+
+        $logger->info('approve and deposit');
         $token = $this->obtainMobileCheckoutToken($transaction);
-        $this->logger->info('token: '.$token);
+        $logger->info('token: '.$token);
 
         // Verify transaction status
-        $this->logger->info('transaction state: '.$transaction->getState());
+        $logger->info('transaction state: '.$transaction->getState());
         if (FinancialTransactionInterface::STATE_PENDING == $transaction->getState())
         {
-            $code = $this->container->get('request')->query->get('error_code');
-            $session_id = $this->container->get('request')->query->get('session_id');
-            if(!empty($code) && !empty($session_id) && $session_id == $transaction->getTrackingId())
+            $request = $this->container->get('request');
+            $logger->info('request: '.$request);
+
+            $code = $request->query->get('error_code');
+            $logger->info('code: '.$code);
+            $session_id = $request->query->get('session_id');
+            $logger->info('session: '.$session_id);
+            if(isset($code) && isset($session_id))
             {
-                if ($code == '0')
+                $logger->info('approve and deposit: valid params');
+                if ($code == '0' && $session_id === $transaction->getTrackingId())
                 {
+                    $logger->info('approve and deposit: OK');
                     // Payment OK
-                    $service = $transaction->getPayment()->getPaymentInstruction()->getExtendedData()->get('level');
-                    $amount = $this->services[$service];
-                    $transaction->setReferenceNumber($this->container->get('request')->query->get('purchase_id'));
+                    $service = $transaction->getPayment()->getPaymentInstruction()->getExtendedData()->get('service');
+                    $logger->info('service: '.$service);
+//                    $services = $this->container->getParameter('payment.virgopass.services');
+                    // foreach ($this->services as $service => $infos)
+                    // {
+                    //     $logger->info($service.':'.$infos['price'].':'.$infos['hours']);
+                    // }
+                    $services = $this->container->getParameter('payment.virgopass.services');
+                    $amount = $services[$service]['price'];
+                    $transaction->setReferenceNumber($request->query->get('purchase_id'));
                     $transaction->setProcessedAmount($amount);
                     $transaction->setResponseCode(PluginInterface::RESPONSE_CODE_SUCCESS);
                     $transaction->setReasonCode(PluginInterface::REASON_CODE_SUCCESS);
-                    $transaction->setState(FinancialTransactionInterface::STATE_SUCCESS);
                 }
                 else
                 {
+                    $logger->info('approve and deposit: KO');
                     // Payment KO
                     $ex = new FinancialException('PaymentAction failed.');
-                    $transaction->setResponseCode('Failed');
-                    $transaction->setReasonCode('PaymentActionFailed');
-                    $transaction->setState(FinancialTransactionInterface::STATE_FAILED);
+                    // $transaction->setResponseCode(PluginInterface::RESPONSE_CODE_PENDING);
+                    // $transaction->setReasonCode(PluginInterface::REASON_CODE_INVALID);
                     $ex->setFinancialTransaction($transaction);
 
                     throw $ex;
@@ -124,6 +128,7 @@ class MobileCheckoutPlugin extends AbstractPlugin
             }
             else
             {
+                $logger->info('approve and deposit: no code');
                 $actionRequest = new ActionRequiredException('User has not yet authorized the transaction.');
                 $actionRequest->setFinancialTransaction($transaction);
                 $actionRequest->setAction(new VisitUrl($this->client->requestPurchase($token, $this->getCallbacksUrl($transaction))));
@@ -220,14 +225,14 @@ class MobileCheckoutPlugin extends AbstractPlugin
             return $data->get('mobile_checkout_token');
         }
 
-        $service = $transaction->getPayment()->getPaymentInstruction()->getExtendedData()->get('level');
-        $this->logger->info('service: '.$service);
+        $service = $transaction->getPayment()->getPaymentInstruction()->getExtendedData()->get('service');
+        $this->container->get('logger')->info('service: '.$service);
 
         $trackingId = $this->getTrackingId();
         $transaction->setTrackingId($trackingId);
 
-        $this->logger->info('session: '.$transaction->getTrackingId());
-        $response = $this->client->requestGetToken($service, $trackingId, $subscription, $this->logger);
+        $this->container->get('logger')->info('session: '.$transaction->getTrackingId());
+        $response = $this->client->requestGetToken($service, $trackingId, $subscription, $this->container->get('logger'));
         $this->throwUnlessSuccessResponse($response, $transaction);
 
         $token = $response->body->get('token');
@@ -302,7 +307,7 @@ class MobileCheckoutPlugin extends AbstractPlugin
         { 
             $id .= chr(mt_rand(ord('A'), ord('Z')));
         }
-        $this->logger->debug('session_id: '.$id);
+        $this->container->get('logger')->debug('session_id: '.$id);
 
         return $id;
     }

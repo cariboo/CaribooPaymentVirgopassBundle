@@ -3,7 +3,7 @@
     "type": "symfony-bundle",
     "description": "Payment Bundle providing access to the Virgopass API",
     "keywords": ["payment", "virgopass"],
-    "homepage": "http://github.com/bundles/CaribooPaymentVirgopassBundle",
+    "homepage": "https://github.com/cariboo/payment-virgopass-bundle",
     "license": "Apache2",
     "authors": [
         {

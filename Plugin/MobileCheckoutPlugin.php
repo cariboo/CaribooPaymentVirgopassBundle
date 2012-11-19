@@ -76,37 +76,23 @@ class MobileCheckoutPlugin extends AbstractPlugin
 
     public function approveAndDeposit(FinancialTransactionInterface $transaction, $retry)
     {
-        $logger = $this->container->get('logger');
-
-        $logger->info('approve and deposit');
         $token = $this->obtainMobileCheckoutToken($transaction);
-        $logger->info('token: '.$token);
 
         // Verify transaction status
-        $logger->info('transaction state: '.$transaction->getState());
-        if (FinancialTransactionInterface::STATE_PENDING == $transaction->getState())
+        if (FinancialTransactionInterface::STATE_NEW == $transaction->getState()
+            || FinancialTransactionInterface::STATE_PENDING == $transaction->getState())
         {
             $request = $this->container->get('request');
-            $logger->info('request: '.$request);
 
             $code = $request->query->get('error_code');
-            $logger->info('code: '.$code);
             $session_id = $request->query->get('session_id');
-            $logger->info('session: '.$session_id);
             if(isset($code) && isset($session_id))
             {
-                $logger->info('approve and deposit: valid params');
-                if ($code == '0' && $session_id === $transaction->getTrackingId())
+                $data = $transaction->getExtendedData();
+                if ($code == '0' && $session_id === $data->get('tracking_id'))
                 {
-                    $logger->info('approve and deposit: OK');
                     // Payment OK
-                    $service = $transaction->getPayment()->getPaymentInstruction()->getExtendedData()->get('service');
-                    $logger->info('service: '.$service);
-//                    $services = $this->container->getParameter('payment.virgopass.services');
-                    // foreach ($this->services as $service => $infos)
-                    // {
-                    //     $logger->info($service.':'.$infos['price'].':'.$infos['hours']);
-                    // }
+                    $service = $transaction->getExtendedData()->get('service');
                     $services = $this->container->getParameter('payment.virgopass.services');
                     $amount = $services[$service]['price'];
                     $transaction->setReferenceNumber($request->query->get('purchase_id'));
@@ -116,11 +102,10 @@ class MobileCheckoutPlugin extends AbstractPlugin
                 }
                 else
                 {
-                    $logger->info('approve and deposit: KO');
                     // Payment KO
                     $ex = new FinancialException('PaymentAction failed.');
-                    // $transaction->setResponseCode(PluginInterface::RESPONSE_CODE_PENDING);
-                    // $transaction->setReasonCode(PluginInterface::REASON_CODE_INVALID);
+                    $transaction->setResponseCode('Failed');
+                    $transaction->setReasonCode(PluginInterface::REASON_CODE_INVALID);
                     $ex->setFinancialTransaction($transaction);
 
                     throw $ex;
@@ -128,77 +113,12 @@ class MobileCheckoutPlugin extends AbstractPlugin
             }
             else
             {
-                $logger->info('approve and deposit: no code');
                 $actionRequest = new ActionRequiredException('User has not yet authorized the transaction.');
                 $actionRequest->setFinancialTransaction($transaction);
                 $actionRequest->setAction(new VisitUrl($this->client->requestPurchase($token, $this->getCallbacksUrl($transaction))));
                 throw $actionRequest;
             }
         }
-
-
-        // $details = $this->client->requestGetExpressCheckoutDetails($token);
-        // $this->throwUnlessSuccessResponse($details, $transaction);
-
-        // verify checkout status
-        // switch ($details->body->get('CHECKOUTSTATUS')) {
-        //     case 'PaymentActionFailed':
-        //         $ex = new FinancialException('PaymentAction failed.');
-        //         $transaction->setResponseCode('Failed');
-        //         $transaction->setReasonCode('PaymentActionFailed');
-        //         $ex->setFinancialTransaction($transaction);
-
-        //         throw $ex;
-
-        //     case 'PaymentCompleted':
-        //         break;
-
-        //     case 'PaymentActionNotInitiated':
-        //         break;
-
-        //     default:
-        //         $actionRequest = new ActionRequiredException('User has not yet authorized the transaction.');
-        //         $actionRequest->setFinancialTransaction($transaction);
-        //         $actionRequest->setAction(new VisitUrl($this->client->getAuthenticateMobileCheckoutTokenUrl($token)));
-
-        //         throw $actionRequest;
-        // }
-
-        // complete the transaction
-        // $data = $transaction->getExtendedData();
-        // $data->set('virgopass_purchase_id', $details->body->get('purchase_id'));
-
-        // $response = $this->client->requestDoExpressCheckoutPayment(
-        //     $data->get('express_checkout_token'),
-        //     $transaction->getRequestedAmount(),
-        //     $paymentAction,
-        //     $details->body->get('PAYERID'),
-        //     array('PAYMENTREQUEST_0_CURRENCYCODE' => $transaction->getPayment()->getPaymentInstruction()->getCurrency())
-        // );
-        // $this->throwUnlessSuccessResponse($response, $transaction);
-
-        // switch($response->body->get('PAYMENTINFO_0_PAYMENTSTATUS')) {
-        //     case 'Completed':
-        //         break;
-
-        //     case 'Pending':
-        //         $transaction->setReferenceNumber($response->body->get('PAYMENTINFO_0_TRANSACTIONID'));
-                
-        //         throw new PaymentPendingException('Payment is still pending: '.$response->body->get('PAYMENTINFO_0_PENDINGREASON'));
-
-        //     default:
-        //         $ex = new FinancialException('PaymentStatus is not completed: '.$response->body->get('PAYMENTINFO_0_PAYMENTSTATUS'));
-        //         $ex->setFinancialTransaction($transaction);
-        //         $transaction->setResponseCode('Failed');
-        //         $transaction->setReasonCode($response->body->get('PAYMENTINFO_0_PAYMENTSTATUS'));
-
-        //         throw $ex;
-        // }
-
-        // $transaction->setReferenceNumber($response->body->get('PAYMENTINFO_0_TRANSACTIONID'));
-        // $transaction->setProcessedAmount($response->body->get('PAYMENTINFO_0_AMT'));
-        // $transaction->setResponseCode(PluginInterface::RESPONSE_CODE_SUCCESS);
-        // $transaction->setReasonCode(PluginInterface::REASON_CODE_SUCCESS);
     }
 
     public function processes($paymentSystemName)
@@ -224,21 +144,12 @@ class MobileCheckoutPlugin extends AbstractPlugin
         if ($data->has('mobile_checkout_token')) {
             return $data->get('mobile_checkout_token');
         }
-
-        $service = $transaction->getPayment()->getPaymentInstruction()->getExtendedData()->get('service');
-        $this->container->get('logger')->info('service: '.$service);
-
-        $trackingId = $this->getTrackingId();
-        $transaction->setTrackingId($trackingId);
-
-        $this->container->get('logger')->info('session: '.$transaction->getTrackingId());
-        $response = $this->client->requestGetToken($service, $trackingId, $subscription, $this->container->get('logger'));
+        $service = $data->get('service');
+        $response = $this->client->requestGetToken($service, $data->get('tracking_id'), $subscription);
         $this->throwUnlessSuccessResponse($response, $transaction);
 
         $token = $response->body->get('token');
         $data->set('mobile_checkout_token', $token);
-
-        $transaction->setState(FinancialTransactionInterface::STATE_PENDING);
 
         return $token;
     }
@@ -266,10 +177,11 @@ class MobileCheckoutPlugin extends AbstractPlugin
 
     protected function getCallbacksUrl(FinancialTransactionInterface $transaction)
     {
+        $data = $transaction->getPayment()->getPaymentInstruction()->getExtendedData();
         $callbacks = array();
-        $callbacks['callback_ok'] = $transaction->getPayment()->getPaymentInstruction()->getExtendedData()->get('return_url');
-        $callbacks['callback_ko'] = $transaction->getPayment()->getPaymentInstruction()->getExtendedData()->get('error_url');
-        $callbacks['callback_cancel'] = $transaction->getPayment()->getPaymentInstruction()->getExtendedData()->get('cancel_url');
+        $callbacks['callback_ok'] = $this->getReturnUrl($data);
+        $callbacks['callback_ko'] = $this->getErrorUrl($data);
+        $callbacks['callback_cancel'] = $this->getCancelUrl($data);
 
         return $callbacks;
     }
@@ -278,7 +190,11 @@ class MobileCheckoutPlugin extends AbstractPlugin
         if ($data->has('return_url')) {
             return $data->get('return_url');
         }
-        return $this->returnUrl;
+        else if (0 !== strlen($this->returnUrl)) {
+            return $this->returnUrl;
+        }
+
+        throw new \RuntimeException('You must configure a return url.');
     }
 
     protected function getErrorUrl(ExtendedDataInterface $data)
@@ -286,7 +202,11 @@ class MobileCheckoutPlugin extends AbstractPlugin
         if ($data->has('error_url')) {
             return $data->get('error_url');
         }
-        return $this->errorUrl;
+        else if (0 !== strlen($this->errorUrl)) {
+            return $this->errorUrl;
+        }
+
+        throw new \RuntimeException('You must configure an error url.');
     }
 
     protected function getCancelUrl(ExtendedDataInterface $data)
@@ -294,21 +214,10 @@ class MobileCheckoutPlugin extends AbstractPlugin
         if ($data->has('cancel_url')) {
             return $data->get('cancel_url');
         }
-        return $this->cancelUrl;
-    }
-
-    protected function getTrackingId()
-    {
-        $now = new \DateTime();
-
-        $id = $now->format('YmdHis');
-        $id .= 'V';
-        for ($i=0; $i < 3; $i++)
-        { 
-            $id .= chr(mt_rand(ord('A'), ord('Z')));
+        else if (0 !== strlen($this->cancelUrl)) {
+            return $this->cancelUrl;
         }
-        $this->container->get('logger')->debug('session_id: '.$id);
 
-        return $id;
+        throw new \RuntimeException('You must configure a cancel url.');
     }
 }

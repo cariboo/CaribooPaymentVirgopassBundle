@@ -121,6 +121,16 @@ class MobileCheckoutPlugin extends AbstractPlugin
         }
     }
 
+    public function processNotify(Request $request)
+    {
+        // $data = $request->request->get('DATA');
+
+        // // Process the transaction
+        // $response = $this->client->requestDoCheckoutPayment($data);
+
+        // return $response;
+    }
+
     public function processes($paymentSystemName)
     {
         return 'virgopass_mobile_checkout' === $paymentSystemName;

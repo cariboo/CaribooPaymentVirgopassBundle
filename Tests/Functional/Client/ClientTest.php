@@ -1,12 +1,12 @@
 <?php
 
-namespace JMS\Payment\PaypalBundle\Tests\Functional\Paypal;
+namespace Cariboo\Payment\VirgopassBundle\Tests\Functional\Client;
 
-use JMS\Payment\PaypalBundle\Client\Authentication\TokenAuthenticationStrategy;
-use JMS\Payment\PaypalBundle\Client\Client;
+use Cariboo\Payment\VirgopassBundle\Client\Authentication\TokenAuthenticationStrategy;
+use Cariboo\Payment\VirgopassBundle\Client\Client;
 
 /*
- * Copyright 2010 Johannes M. Schmitt <schmittjoh@gmail.com>
+ * Copyright 2012 Stephane Decleire <sdecleire@cariboo-networks.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,48 +24,69 @@ use JMS\Payment\PaypalBundle\Client\Client;
 class ClientTest extends \PHPUnit_Framework_TestCase
 {
     /**
-     * @var \JMS\Payment\PaypalBundle\Client\Client
+     * @var \Cariboo\Payment\VirgopassBundle\Client\Client
      */
     protected $client;
 
     protected function setUp()
     {
-        if (empty($_SERVER['API_USERNAME']) || empty($_SERVER['API_PASSWORD']) || empty($_SERVER['API_SIGNATURE'])) {
-            $this->markTestSkipped('In order to run these tests you have to configure: API_USERNAME, API_PASSWORD, API_SIGNATURE parameters in phpunit.xml file');
+        if (empty($_SERVER['API_USERNAME']) || empty($_SERVER['API_PASSWORD'])) {
+            $this->markTestSkipped('In order to run these tests you have to configure: API_USERNAME, API_PASSWORD parameters in phpunit.xml file');
         }
 
         $authenticationStrategy = new TokenAuthenticationStrategy(
             $_SERVER['API_USERNAME'],
-            $_SERVER['API_PASSWORD'],
-            $_SERVER['API_SIGNATURE']
+            $_SERVER['API_PASSWORD']
         );
 
         $this->client = new Client($authenticationStrategy, $debug = true);
     }
 
-    public function testRequestSetExpressCheckout()
+    public function testRequestGetToken()
     {
-        $response = $this->client->requestSetExpressCheckout(123.43, 'http://www.foo.com/returnUrl', 'http://www.foo.com/cancelUrl');
-
-        $this->assertInstanceOf('JMS\Payment\PaypalBundle\Client\Response', $response);
-        $this->assertTrue($response->body->has('TOKEN'));
+        $response = $this->client->requestGetToken($_SERVER['ONETIME_SERVICE_ID'], 1024, $subscription = null);
+        
+        $this->assertInstanceOf('Cariboo\Payment\VirgopassBundle\Client\Response', $response);
+        $this->assertTrue($response->body->has('error_code'));
         $this->assertTrue($response->isSuccess());
-        $this->assertEquals('Success', $response->body->get('ACK'));
+        $this->assertEquals(0, $response->body->get('error_code'));
+        $this->assertTrue($response->body->has('token'));
     }
 
-    public function testRequestGetExpressCheckoutDetails()
-    {
-        $response = $this->client->requestSetExpressCheckout('123', 'http://www.foo.com/', 'http://www.foo.com/');
+    // public function testRequestGetServiceInfo()
+    // {
+    //     $response = $this->client->requestGetServiceInfo($_SERVER['ONETIME_SERVICE_ID']);
 
-        //guard
-        $this->assertInstanceOf('JMS\Payment\PaypalBundle\Client\Response', $response);
-        $this->assertTrue($response->body->has('TOKEN'));
+    //     $this->assertInstanceOf('Cariboo\Payment\VirgopassBundle\Client\Response', $response);
+    //     $this->assertTrue($response->isSuccess());
+    //     $this->assertTrue($response->body->has('subscription_id'));
+    //     $this->assertTrue($response->body->has('status'));
+    //     $this->assertEquals(false, $response->body->has('status'));
+    // }
 
-        $response = $this->client->requestGetExpressCheckoutDetails($response->body->get('TOKEN'));
+    // public function testRequestSetExpressCheckout()
+    // {
+    //     $response = $this->client->requestSetExpressCheckout(123.43, 'http://www.foo.com/returnUrl', 'http://www.foo.com/cancelUrl');
 
-        $this->assertTrue($response->body->has('TOKEN'));
-        $this->assertTrue($response->body->has('CHECKOUTSTATUS'));
-        $this->assertEquals('PaymentActionNotInitiated', $response->body->get('CHECKOUTSTATUS'));
-        $this->assertEquals('Success', $response->body->get('ACK'));
-    }
+    //     $this->assertInstanceOf('JMS\Payment\PaypalBundle\Client\Response', $response);
+    //     $this->assertTrue($response->body->has('TOKEN'));
+    //     $this->assertTrue($response->isSuccess());
+    //     $this->assertEquals('Success', $response->body->get('ACK'));
+    // }
+
+    // public function testRequestGetExpressCheckoutDetails()
+    // {
+    //     $response = $this->client->requestSetExpressCheckout('123', 'http://www.foo.com/', 'http://www.foo.com/');
+
+    //     //guard
+    //     $this->assertInstanceOf('JMS\Payment\PaypalBundle\Client\Response', $response);
+    //     $this->assertTrue($response->body->has('TOKEN'));
+
+    //     $response = $this->client->requestGetExpressCheckoutDetails($response->body->get('TOKEN'));
+
+    //     $this->assertTrue($response->body->has('TOKEN'));
+    //     $this->assertTrue($response->body->has('CHECKOUTSTATUS'));
+    //     $this->assertEquals('PaymentActionNotInitiated', $response->body->get('CHECKOUTSTATUS'));
+    //     $this->assertEquals('Success', $response->body->get('ACK'));
+    // }
 }

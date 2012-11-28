@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<phpunit bootstrap="./Tests/bootstrap.php">
+<phpunit bootstrap="./vendor/autoload.php">
     <testsuites>
         <testsuite name="CaribooPaymentVirgopassBundle">
             <directory suffix="Test.php">./Tests</directory>
@@ -9,8 +9,9 @@
 
     <php>
         <!-- Sandbox Credentials only :) -->
-        <server name="API_LOGIN" value="" />
-        <server name="API_PASSWORD" value="" />
-        <server name="API_SERVICE" value="" />
+        <server name="API_LOGIN" value="my_login" />
+        <server name="API_PASSWORD" value="my_password" />
+        <server name="ONETIME_SERVICE_ID" value="my_onetime_service" />
+        <server name="SUBSCRIPTION_SERVICE_ID" value="my_subscription_service" />
     </php>
 </phpunit>

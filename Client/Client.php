@@ -81,7 +81,7 @@ class Client
     public function requestPurchase($token, array $optionalParameters = array())
     {
 
-        return $this->getApiURL('purchase', array_merge($optionalParameters, array(
+        return $this->getApiUrl('purchase', array_merge($optionalParameters, array(
             'token' => $token,
         )));
     }
@@ -98,7 +98,7 @@ class Client
      */
     public function requestSubscription($token, array $optionalParameters = array())
     {
-        return $this->getApiURL('subscription', array_merge($optionalParameters, array(
+        return $this->getApiUrl('subscription', array_merge($optionalParameters, array(
             'token' => $token,
         )));
     }
@@ -113,7 +113,7 @@ class Client
      */
     public function requestResiliation($token, array $optionalParameters = array())
     {
-        return $this->getApiURL('resiliation', array_merge($optionalParameters, array(
+        return $this->getApiUrl('resiliation', array_merge($optionalParameters, array(
             'token' => $token,
         )));
     }
@@ -189,7 +189,7 @@ class Client
         return new Response($response->getContent());
     }
 
-    protected function getApiURL($method, array $parameters)
+    protected function getApiUrl($method, array $parameters)
     {
         $url = $this->authenticationStrategy->getApiEndpoint(self::API_VERSION, $method, $this->isDebug);
         foreach ($parameters as $name => $value)

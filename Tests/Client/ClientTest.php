@@ -1,46 +1,72 @@
 <?php
 
-namespace JMS\Payment\PaypalBundle\Tests\Paypal;
+namespace Cariboo\Payment\VirgopassBundle\Tests\Client;
 
-use JMS\Payment\PaypalBundle\Client\Client;
+use Cariboo\Payment\VirgopassBundle\Client\Client;
+use Cariboo\Payment\VirgopassBundle\Client\Authentication\TokenAuthenticationStrategy;
+
+/*
+ * Copyright 2012 Stephane Decleire <sdecleire@cariboo-networks.com>
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 class ClientTest extends \PHPUnit_Framework_TestCase
 {
-    public static function provideExpectedAuthenticateExpressCheckoutTokenUrlsDependsOnDebugFlag()
+    // /**
+    //  * @var \Cariboo\Payment\VirgopassBundle\Client\Authentication\TokenAuthenticationStrategy
+    //  */
+    protected $authenticationStrategy;
+
+    protected function setUp()
     {
-        return array(
-            array(true, 'foobar', 'https://www.sandbox.paypal.com'),
-            array(false, 'barfoo', 'https://www.paypal.com'),
+        if (empty($_SERVER['API_USERNAME']) || empty($_SERVER['API_PASSWORD'])) {
+            $this->markTestSkipped('In order to run these tests you have to configure: API_USERNAME, API_PASSWORD parameters in phpunit.xml file');
+        }
+
+        $this->authenticationStrategy = new TokenAuthenticationStrategy(
+            $_SERVER['API_USERNAME'],
+            $_SERVER['API_PASSWORD']
         );
     }
 
-    public function testShouldAllowGetAuthenticateExpressCheckoutTokenUrlInDebugMode()
+    public function testShouldAllowRequestPurchaseInDebugMode()
     {
-        $expectedUrl = 'https://www.paypal.com/cgi-bin/webscr?cmd=_express-checkout&token=foobar';
+        $expectedUrl = 'http://sandbox.virgopass.com/api_v1.5.php?purchase&token=foobar';
 
         $token = 'foobar';
 
-        $client = new Client($this->createAuthenticationStrategyMock(), $debug = false);
+        $client = new Client($this->authenticationStrategy, $debug = true);
 
-        $this->assertEquals($expectedUrl, $client->getAuthenticateExpressCheckoutTokenUrl($token));
+        $this->assertEquals($expectedUrl, $client->requestPurchase($token, array()));
     }
 
-    public function testShouldAllowGetAuthenticateExpressCheckoutTokenUrlInProdMode()
+    public function testShouldAllowRequestPurchaseInProdMode()
     {
-        $expectedUrl = 'https://www.sandbox.paypal.com/cgi-bin/webscr?cmd=_express-checkout&token=foobar';
+        $expectedUrl = 'http://billing.virgopass.com/api_v1.5.php?purchase&token=barfoo';
 
-        $token = 'foobar';
+        $token = 'barfoo';
 
-        $client = new Client($this->createAuthenticationStrategyMock(), $debug = true);
+        $client = new Client($this->authenticationStrategy, $debug = false);
 
-        $this->assertEquals($expectedUrl, $client->getAuthenticateExpressCheckoutTokenUrl($token));
+        $this->assertEquals($expectedUrl, $client->requestPurchase($token, array()));
     }
 
     /**
-     * @return \PHPUnit_Framework_MockObject_MockObject|\JMS\Payment\PaypalBundle\Client\Authentication\AuthenticationStrategyInterface
+     * @return \PHPUnit_Framework_MockObject_MockObject|\Cariboo\Payment\VirgopassBundle\Client\Authentication\AuthenticationStrategyInterface
      */
     public function createAuthenticationStrategyMock()
     {
-        return $this->getMock('JMS\Payment\PaypalBundle\Client\Authentication\AuthenticationStrategyInterface');
+        return $this->getMock('Cariboo\Payment\VirgopassBundle\Client\Authentication\AuthenticationStrategyInterface');
     }
 }

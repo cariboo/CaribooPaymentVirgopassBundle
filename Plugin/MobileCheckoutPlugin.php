@@ -3,6 +3,7 @@
 namespace Cariboo\Payment\VirgopassBundle\Plugin;
 
 use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Component\HttpFoundation\Request;
 use JMS\Payment\CoreBundle\Model\ExtendedDataInterface;
 use JMS\Payment\CoreBundle\Model\FinancialTransactionInterface;
 use JMS\Payment\CoreBundle\Plugin\AbstractPlugin;
@@ -115,7 +116,7 @@ class MobileCheckoutPlugin extends AbstractPlugin
             {
                 $actionRequest = new ActionRequiredException('User has not yet authorized the transaction.');
                 $actionRequest->setFinancialTransaction($transaction);
-                $actionRequest->setAction(new VisitUrl($this->client->requestPurchase($token, $this->getCallbacksUrl($transaction))));
+                $actionRequest->setAction(new VisitUrl($this->client->requestPurchase($token, $this->getCallbackUrls($transaction))));
                 throw $actionRequest;
             }
         }
@@ -123,12 +124,6 @@ class MobileCheckoutPlugin extends AbstractPlugin
 
     public function processNotify(Request $request)
     {
-        // $data = $request->request->get('DATA');
-
-        // // Process the transaction
-        // $response = $this->client->requestDoCheckoutPayment($data);
-
-        // return $response;
     }
 
     public function processes($paymentSystemName)
@@ -185,9 +180,9 @@ class MobileCheckoutPlugin extends AbstractPlugin
         throw $ex;
     }
 
-    protected function getCallbacksUrl(FinancialTransactionInterface $transaction)
+    protected function getCallbackUrls(FinancialTransactionInterface $transaction)
     {
-        $data = $transaction->getPayment()->getPaymentInstruction()->getExtendedData();
+        $data = $transaction->getExtendedData();
         $callbacks = array();
         $callbacks['callback_ok'] = $this->getReturnUrl($data);
         $callbacks['callback_ko'] = $this->getErrorUrl($data);
